@@ -4,13 +4,13 @@ import pylab as pl
 import numpy as np
 
 V = np.array
-r2h = lambda x: colors.rgb2hex(tuple(map(lambda y: y / 255., x)))
+def r2h(x): return colors.rgb2hex(tuple(map(lambda y: y / 255., x)))
+
+
 surface_color = r2h((255, 230, 205))
 edge_color = r2h((90, 90, 90))
 edge_colors = (r2h((15, 167, 175)), r2h((230, 81, 81)), r2h((142, 105, 252)), r2h((248, 235, 57)),
                r2h((51, 159, 255)), r2h((225, 117, 231)), r2h((97, 243, 185)), r2h((161, 183, 196)))
-
-
 
 
 def init_plot():
@@ -49,7 +49,7 @@ def surfaces(mesh, plot):
     vs, faces, edges = mesh
     vtx = vs[faces]
     edgecolor = edge_color if not len(edges) else 'none'
-    tri = a3.art3d.Poly3DCollection(vtx, facecolors=surface_color +'55', edgecolors=edgecolor,
+    tri = a3.art3d.Poly3DCollection(vtx, facecolors=surface_color + '55', edgecolors=edgecolor,
                                     linewidths=.5, linestyles='dashdot')
     plot[0].add_collection3d(tri)
     return plot
@@ -60,7 +60,8 @@ def segments(mesh, plot):
     for edge_c, edge_group in enumerate(edges):
         for edge_idx in edge_group:
             edge = vs[edge_idx]
-            line = a3.art3d.Line3DCollection([edge],  linewidths=.5, linestyles='dashdot')
+            line = a3.art3d.Line3DCollection(
+                [edge],  linewidths=.5, linestyles='dashdot')
             line.set_color(edge_colors[edge_c % len(edge_colors)])
             plot[0].add_collection3d(line)
     return plot
@@ -135,11 +136,12 @@ def view_meshes(*files, offset=.2):
         mesh, scale = parse_obje(file, scale)
         max_x_current = mesh[0][:, 0].max()
         mesh[0][:, 0] += max_x + offset
-        plot = plot_mesh(mesh, surfaces, segments, plot=plot, show=file == files[-1])
+        plot = plot_mesh(mesh, surfaces, segments,
+                         plot=plot, show=file == files[-1])
         max_x += max_x_current + offset
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser("view meshes")
     parser.add_argument('--files', nargs='+', default=['checkpoints/human_seg/meshes/shrec__14_0.obj',
@@ -149,4 +151,3 @@ if __name__=='__main__':
 
     # view meshes
     view_meshes(*args.files)
-

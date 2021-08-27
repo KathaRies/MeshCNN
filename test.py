@@ -1,7 +1,7 @@
-from options.test_options import TestOptions
-from data import DataLoader
-from models import create_model
-from util.writer import Writer
+from MeshCNN.options.test_options import TestOptions
+from MeshCNN.data import DataLoader
+from MeshCNN.models import create_model
+from MeshCNN.util.writer import Writer
 
 
 def run_test(epoch=-1):

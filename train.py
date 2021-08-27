@@ -1,9 +1,9 @@
 import time
-from options.train_options import TrainOptions
-from data import DataLoader
-from models import create_model
-from util.writer import Writer
-from test import run_test
+from MeshCNN.options.train_options import TrainOptions
+from MeshCNN.data import DataLoader
+from MeshCNN.models import create_model
+from MeshCNN.util.writer import Writer
+from MeshCNN.test import run_test
 
 if __name__ == '__main__':
     opt = TrainOptions().parse()

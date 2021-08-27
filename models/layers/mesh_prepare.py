@@ -26,15 +26,18 @@ def fill_mesh(mesh2fill, file: str, opt):
     mesh2fill.features = mesh_data['features']
     mesh2fill.sides = mesh_data['sides']
 
+
 def get_mesh_path(file: str, num_aug: int):
     filename, _ = os.path.splitext(file)
     dir_name = os.path.dirname(filename)
     prefix = os.path.basename(filename)
     load_dir = os.path.join(dir_name, 'cache')
-    load_file = os.path.join(load_dir, '%s_%03d.npz' % (prefix, np.random.randint(0, num_aug)))
+    load_file = os.path.join(load_dir, '%s_%03d.npz' %
+                             (prefix, np.random.randint(0, num_aug)))
     if not os.path.isdir(load_dir):
         os.makedirs(load_dir, exist_ok=True)
     return load_file
+
 
 def from_scratch(file, opt):
 
@@ -61,6 +64,7 @@ def from_scratch(file, opt):
         post_augmentation(mesh_data, opt)
     mesh_data.features = extract_features(mesh_data)
     return mesh_data
+
 
 def fill_from_file(mesh, file):
     mesh.filename = ntpath.split(file)[1]
@@ -147,18 +151,24 @@ def build_gemm(mesh, faces, face_areas):
             mesh.edge_areas[edge2key[edge]] += face_areas[face_id] / 3
         for idx, edge in enumerate(faces_edges):
             edge_key = edge2key[edge]
-            edge_nb[edge_key][nb_count[edge_key]] = edge2key[faces_edges[(idx + 1) % 3]]
-            edge_nb[edge_key][nb_count[edge_key] + 1] = edge2key[faces_edges[(idx + 2) % 3]]
+            edge_nb[edge_key][nb_count[edge_key]
+                              ] = edge2key[faces_edges[(idx + 1) % 3]]
+            edge_nb[edge_key][nb_count[edge_key] +
+                              1] = edge2key[faces_edges[(idx + 2) % 3]]
             nb_count[edge_key] += 2
         for idx, edge in enumerate(faces_edges):
             edge_key = edge2key[edge]
-            sides[edge_key][nb_count[edge_key] - 2] = nb_count[edge2key[faces_edges[(idx + 1) % 3]]] - 1
-            sides[edge_key][nb_count[edge_key] - 1] = nb_count[edge2key[faces_edges[(idx + 2) % 3]]] - 2
+            sides[edge_key][nb_count[edge_key] -
+                            2] = nb_count[edge2key[faces_edges[(idx + 1) % 3]]] - 1
+            sides[edge_key][nb_count[edge_key] -
+                            1] = nb_count[edge2key[faces_edges[(idx + 2) % 3]]] - 2
     mesh.edges = np.array(edges, dtype=np.int32)
     mesh.gemm_edges = np.array(edge_nb, dtype=np.int64)
     mesh.sides = np.array(sides, dtype=np.int64)
     mesh.edges_count = edges_count
-    mesh.edge_areas = np.array(mesh.edge_areas, dtype=np.float32) / np.sum(face_areas) #todo whats the difference between edge_areas and edge_lenghts?
+    # todo whats the difference between edge_areas and edge_lenghts?
+    mesh.edge_areas = np.array(
+        mesh.edge_areas, dtype=np.float32) / np.sum(face_areas)
 
 
 def compute_face_normals_and_areas(mesh, faces):
@@ -166,7 +176,8 @@ def compute_face_normals_and_areas(mesh, faces):
                             mesh.vs[faces[:, 2]] - mesh.vs[faces[:, 1]])
     face_areas = np.sqrt((face_normals ** 2).sum(axis=1))
     face_normals /= face_areas[:, np.newaxis]
-    assert (not np.any(face_areas[:, np.newaxis] == 0)), 'has zero area face: %s' % mesh.filename
+    assert (not np.any(face_areas[:, np.newaxis] == 0)
+            ), 'has zero area face: %s' % mesh.filename
     face_areas *= 0.5
     return face_normals, face_areas
 
@@ -187,7 +198,8 @@ def post_augmentation(mesh, opt):
 
 def slide_verts(mesh, prct):
     edge_points = get_edge_points(mesh)
-    dihedral = dihedral_angle(mesh, edge_points).squeeze() #todo make fixed_division epsilon=0
+    # todo make fixed_division epsilon=0
+    dihedral = dihedral_angle(mesh, edge_points).squeeze()
     thr = np.mean(dihedral) + np.std(dihedral)
     vids = np.random.permutation(len(mesh.ve))
     target = int(prct * len(vids))
@@ -198,7 +210,8 @@ def slide_verts(mesh, prct):
             if min(dihedral[edges]) > 2.65:
                 edge = mesh.edges[np.random.choice(edges)]
                 vi_t = edge[1] if vi == edge[0] else edge[0]
-                nv = mesh.vs[vi] + np.random.uniform(0.2, 0.5) * (mesh.vs[vi_t] - mesh.vs[vi])
+                nv = mesh.vs[vi] + \
+                    np.random.uniform(0.2, 0.5) * (mesh.vs[vi_t] - mesh.vs[vi])
                 mesh.vs[vi] = nv
                 shifted += 1
         else:
@@ -214,10 +227,13 @@ def scale_verts(mesh, mean=1, var=0.1):
 def angles_from_faces(mesh, edge_faces, faces):
     normals = [None, None]
     for i in range(2):
-        edge_a = mesh.vs[faces[edge_faces[:, i], 2]] - mesh.vs[faces[edge_faces[:, i], 1]]
-        edge_b = mesh.vs[faces[edge_faces[:, i], 1]] - mesh.vs[faces[edge_faces[:, i], 0]]
+        edge_a = mesh.vs[faces[edge_faces[:, i], 2]] - \
+            mesh.vs[faces[edge_faces[:, i], 1]]
+        edge_b = mesh.vs[faces[edge_faces[:, i], 1]] - \
+            mesh.vs[faces[edge_faces[:, i], 0]]
         normals[i] = np.cross(edge_a, edge_b)
-        div = fixed_division(np.linalg.norm(normals[i], ord=2, axis=1), epsilon=0)
+        div = fixed_division(np.linalg.norm(
+            normals[i], ord=2, axis=1), epsilon=0)
         normals[i] /= div[:, np.newaxis]
     dot = np.sum(normals[0] * normals[1], axis=1).clip(-1, 1)
     angles = np.pi - np.arccos(dot)
@@ -239,7 +255,8 @@ def flip_edges(mesh, prct, faces):
             edge_info = edge_faces[edge_key]
             if edge_info[3] == -1:
                 continue
-            new_edge = tuple(sorted(list(set(faces[edge_info[2]]) ^ set(faces[edge_info[3]]))))
+            new_edge = tuple(
+                sorted(list(set(faces[edge_info[2]]) ^ set(faces[edge_info[3]]))))
             if new_edge in edges_dict:
                 continue
             new_faces = np.array(
@@ -253,7 +270,8 @@ def flip_edges(mesh, prct, faces):
                 for i, face_id in enumerate([edge_info[2], edge_info[3]]):
                     cur_face = faces[face_id]
                     for j in range(3):
-                        cur_edge = tuple(sorted((cur_face[j], cur_face[(j + 1) % 3])))
+                        cur_edge = tuple(
+                            sorted((cur_face[j], cur_face[(j + 1) % 3])))
                         if cur_edge != new_edge:
                             cur_edge_key = edges_dict[cur_edge]
                             for idx, face_nb in enumerate(
@@ -272,6 +290,7 @@ def rebuild_face(face, new_face):
             face[i] = new_point
             break
     return face
+
 
 def check_area(mesh, faces):
     face_normals = np.cross(mesh.vs[faces[:, 1]] - mesh.vs[faces[:, 0]],
@@ -303,7 +322,8 @@ def get_edge_faces(faces):
 def set_edge_lengths(mesh, edge_points=None):
     if edge_points is not None:
         edge_points = get_edge_points(mesh)
-    edge_lengths = np.linalg.norm(mesh.vs[edge_points[:, 0]] - mesh.vs[edge_points[:, 1]], ord=2, axis=1)
+    edge_lengths = np.linalg.norm(
+        mesh.vs[edge_points[:, 0]] - mesh.vs[edge_points[:, 1]], ord=2, axis=1)
     mesh.edge_lengths = edge_lengths
 
 
@@ -337,7 +357,8 @@ def symmetric_opposite_angles(mesh, edge_points):
     """
     angles_a = get_opposite_angles(mesh, edge_points, 0)
     angles_b = get_opposite_angles(mesh, edge_points, 3)
-    angles = np.concatenate((np.expand_dims(angles_a, 0), np.expand_dims(angles_b, 0)), axis=0)
+    angles = np.concatenate(
+        (np.expand_dims(angles_a, 0), np.expand_dims(angles_b, 0)), axis=0)
     angles = np.sort(angles, axis=0)
     return angles
 
@@ -349,7 +370,8 @@ def symmetric_ratios(mesh, edge_points):
     """
     ratios_a = get_ratios(mesh, edge_points, 0)
     ratios_b = get_ratios(mesh, edge_points, 3)
-    ratios = np.concatenate((np.expand_dims(ratios_a, 0), np.expand_dims(ratios_b, 0)), axis=0)
+    ratios = np.concatenate(
+        (np.expand_dims(ratios_a, 0), np.expand_dims(ratios_b, 0)), axis=0)
     return np.sort(ratios, axis=0)
 
 
@@ -396,19 +418,26 @@ def get_side_points(mesh, edge_id):
 
 
 def get_normals(mesh, edge_points, side):
-    edge_a = mesh.vs[edge_points[:, side // 2 + 2]] - mesh.vs[edge_points[:, side // 2]]
-    edge_b = mesh.vs[edge_points[:, 1 - side // 2]] - mesh.vs[edge_points[:, side // 2]]
+    edge_a = mesh.vs[edge_points[:, side // 2 + 2]] - \
+        mesh.vs[edge_points[:, side // 2]]
+    edge_b = mesh.vs[edge_points[:, 1 - side // 2]] - \
+        mesh.vs[edge_points[:, side // 2]]
     normals = np.cross(edge_a, edge_b)
     div = fixed_division(np.linalg.norm(normals, ord=2, axis=1), epsilon=0.1)
     normals /= div[:, np.newaxis]
     return normals
 
-def get_opposite_angles(mesh, edge_points, side):
-    edges_a = mesh.vs[edge_points[:, side // 2]] - mesh.vs[edge_points[:, side // 2 + 2]]
-    edges_b = mesh.vs[edge_points[:, 1 - side // 2]] - mesh.vs[edge_points[:, side // 2 + 2]]
 
-    edges_a /= fixed_division(np.linalg.norm(edges_a, ord=2, axis=1), epsilon=0.1)[:, np.newaxis]
-    edges_b /= fixed_division(np.linalg.norm(edges_b, ord=2, axis=1), epsilon=0.1)[:, np.newaxis]
+def get_opposite_angles(mesh, edge_points, side):
+    edges_a = mesh.vs[edge_points[:, side // 2]] - \
+        mesh.vs[edge_points[:, side // 2 + 2]]
+    edges_b = mesh.vs[edge_points[:, 1 - side // 2]] - \
+        mesh.vs[edge_points[:, side // 2 + 2]]
+
+    edges_a /= fixed_division(np.linalg.norm(edges_a,
+                              ord=2, axis=1), epsilon=0.1)[:, np.newaxis]
+    edges_b /= fixed_division(np.linalg.norm(edges_b,
+                              ord=2, axis=1), epsilon=0.1)[:, np.newaxis]
     dot = np.sum(edges_a * edges_b, axis=1).clip(-1, 1)
     return np.arccos(dot)
 
@@ -422,9 +451,11 @@ def get_ratios(mesh, edge_points, side):
     line_ab = point_b - point_a
     projection_length = np.sum(line_ab * (point_o - point_a), axis=1) / fixed_division(
         np.linalg.norm(line_ab, ord=2, axis=1), epsilon=0.1)
-    closest_point = point_a + (projection_length / edges_lengths)[:, np.newaxis] * line_ab
+    closest_point = point_a + \
+        (projection_length / edges_lengths)[:, np.newaxis] * line_ab
     d = np.linalg.norm(point_o - closest_point, ord=2, axis=1)
     return d / edges_lengths
+
 
 def fixed_division(to_div, epsilon):
     if epsilon == 0:

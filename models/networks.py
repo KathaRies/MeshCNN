@@ -1,12 +1,14 @@
+import functools
+
 import torch
 import torch.nn as nn
 from torch.nn import init
-import functools
 from torch.optim import lr_scheduler
-from models.layers.mesh_conv import MeshConv
 import torch.nn.functional as F
-from models.layers.mesh_pool import MeshPool
-from models.layers.mesh_unpool import MeshUnpool
+
+from MeshCNN.models.layers.mesh_conv import MeshConv
+from MeshCNN.models.layers.mesh_pool import MeshPool
+from MeshCNN.models.layers.mesh_unpool import MeshUnpool
 
 
 ###############################################################################
@@ -20,12 +22,15 @@ def get_norm_layer(norm_type='instance', num_groups=1):
     elif norm_type == 'instance':
         norm_layer = functools.partial(nn.InstanceNorm2d, affine=False)
     elif norm_type == 'group':
-        norm_layer = functools.partial(nn.GroupNorm, affine=True, num_groups=num_groups)
+        norm_layer = functools.partial(
+            nn.GroupNorm, affine=True, num_groups=num_groups)
     elif norm_type == 'none':
         norm_layer = NoNorm
     else:
-        raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
+        raise NotImplementedError(
+            'normalization layer [%s] is not found' % norm_type)
     return norm_layer
+
 
 def get_norm_args(norm_layer, nfeats_list):
     if hasattr(norm_layer, '__name__') and norm_layer.__name__ == 'NoNorm':
@@ -35,28 +40,36 @@ def get_norm_args(norm_layer, nfeats_list):
     elif norm_layer.func.__name__ == 'BatchNorm':
         norm_args = [{'num_features': f} for f in nfeats_list]
     else:
-        raise NotImplementedError('normalization layer [%s] is not found' % norm_layer.func.__name__)
+        raise NotImplementedError(
+            'normalization layer [%s] is not found' % norm_layer.func.__name__)
     return norm_args
 
-class NoNorm(nn.Module): #todo with abstractclass and pass
+
+class NoNorm(nn.Module):  # todo with abstractclass and pass
     def __init__(self, fake=True):
         self.fake = fake
         super(NoNorm, self).__init__()
+
     def forward(self, x):
         return x
+
     def __call__(self, x):
         return self.forward(x)
+
 
 def get_scheduler(optimizer, opt):
     if opt.lr_policy == 'lambda':
         def lambda_rule(epoch):
-            lr_l = 1.0 - max(0, epoch + 1 + opt.epoch_count - opt.niter) / float(opt.niter_decay + 1)
+            lr_l = 1.0 - max(0, epoch + 1 + opt.epoch_count -
+                             opt.niter) / float(opt.niter_decay + 1)
             return lr_l
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
     elif opt.lr_policy == 'step':
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
+        scheduler = lr_scheduler.StepLR(
+            optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
     elif opt.lr_policy == 'plateau':
-        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
+        scheduler = lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
     else:
         return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
     return scheduler
@@ -75,7 +88,8 @@ def init_weights(net, init_type, init_gain):
             elif init_type == 'orthogonal':
                 init.orthogonal_(m.weight.data, gain=init_gain)
             else:
-                raise NotImplementedError('initialization method [%s] is not implemented' % init_type)
+                raise NotImplementedError(
+                    'initialization method [%s] is not implemented' % init_type)
         elif classname.find('BatchNorm2d') != -1:
             init.normal_(m.weight.data, 1.0, init_gain)
             init.constant_(m.bias.data, 0.0)
@@ -107,8 +121,10 @@ def define_classifier(input_nc, ncf, ninput_edges, nclasses, opt, gpu_ids, arch,
         net = MeshEncoderDecoder(pool_res, down_convs, up_convs, blocks=opt.resblocks,
                                  transfer_data=True)
     else:
-        raise NotImplementedError('Encoder model name [%s] is not recognized' % arch)
+        raise NotImplementedError(
+            'Encoder model name [%s] is not recognized' % arch)
     return init_net(net, init_type, init_gain, gpu_ids)
+
 
 def define_loss(opt):
     if opt.dataset_mode == 'classification':
@@ -121,9 +137,11 @@ def define_loss(opt):
 # Classes For Classification / Segmentation Networks
 ##############################################################################
 
+
 class MeshConvNet(nn.Module):
     """Network for learning a global shape descriptor (classification)
     """
+
     def __init__(self, norm_layer, nf0, conv_res, nclasses, input_res, pool_res, fc_n,
                  nresblocks=3):
         super(MeshConvNet, self).__init__()
@@ -132,10 +150,10 @@ class MeshConvNet(nn.Module):
         norm_args = get_norm_args(norm_layer, self.k[1:])
 
         for i, ki in enumerate(self.k[:-1]):
-            setattr(self, 'conv{}'.format(i), MResConv(ki, self.k[i + 1], nresblocks))
+            setattr(self, 'conv{}'.format(i), MResConv(
+                ki, self.k[i + 1], nresblocks))
             setattr(self, 'norm{}'.format(i), norm_layer(**norm_args[i]))
             setattr(self, 'pool{}'.format(i), MeshPool(self.res[i + 1]))
-
 
         self.gp = torch.nn.AvgPool1d(self.res[-1])
         # self.gp = torch.nn.MaxPool1d(self.res[-1])
@@ -156,6 +174,7 @@ class MeshConvNet(nn.Module):
         x = self.fc2(x)
         return x
 
+
 class MResConv(nn.Module):
     def __init__(self, in_channels, out_channels, skips=1):
         super(MResConv, self).__init__()
@@ -164,7 +183,8 @@ class MResConv(nn.Module):
         self.skips = skips
         self.conv0 = MeshConv(self.in_channels, self.out_channels, bias=False)
         for i in range(self.skips):
-            setattr(self, 'bn{}'.format(i + 1), nn.BatchNorm2d(self.out_channels))
+            setattr(self, 'bn{}'.format(i + 1),
+                    nn.BatchNorm2d(self.out_channels))
             setattr(self, 'conv{}'.format(i + 1),
                     MeshConv(self.out_channels, self.out_channels, bias=False))
 
@@ -182,13 +202,15 @@ class MResConv(nn.Module):
 class MeshEncoderDecoder(nn.Module):
     """Network for fully-convolutional tasks (segmentation)
     """
+
     def __init__(self, pools, down_convs, up_convs, blocks=0, transfer_data=True):
         super(MeshEncoderDecoder, self).__init__()
         self.transfer_data = transfer_data
         self.encoder = MeshEncoder(pools, down_convs, blocks=blocks)
         unrolls = pools[:-1].copy()
         unrolls.reverse()
-        self.decoder = MeshDecoder(unrolls, up_convs, blocks=blocks, transfer_data=transfer_data)
+        self.decoder = MeshDecoder(
+            unrolls, up_convs, blocks=blocks, transfer_data=transfer_data)
 
     def forward(self, x, meshes):
         fe, before_pool = self.encoder((x, meshes))
@@ -197,6 +219,7 @@ class MeshEncoderDecoder(nn.Module):
 
     def __call__(self, x, meshes):
         return self.forward(x, meshes)
+
 
 class DownConv(nn.Module):
     def __init__(self, in_channels, out_channels, blocks=0, pool=0):
@@ -300,7 +323,8 @@ class MeshEncoder(nn.Module):
                 pool = pools[i + 1]
             else:
                 pool = 0
-            self.convs.append(DownConv(convs[i], convs[i + 1], blocks=blocks, pool=pool))
+            self.convs.append(
+                DownConv(convs[i], convs[i + 1], blocks=blocks, pool=pool))
         self.global_pool = None
         if fcs is not None:
             self.fcs = []
@@ -378,9 +402,11 @@ class MeshDecoder(nn.Module):
     def __call__(self, x, encoder_outs=None):
         return self.forward(x, encoder_outs)
 
-def reset_params(model): # todo replace with my init
+
+def reset_params(model):  # todo replace with my init
     for i, m in enumerate(model.modules()):
         weight_init(m)
+
 
 def weight_init(m):
     if isinstance(m, nn.Conv2d):
