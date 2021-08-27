@@ -1,19 +1,23 @@
 import os
 import torch
-from data.base_dataset import BaseDataset
-from util.util import is_mesh_file, pad
-from models.layers.mesh import Mesh
+
+from MeshCNN.data.base_dataset import BaseDataset
+from MeshCNN.util.util import is_mesh_file, pad
+from MeshCNN.models.layers.mesh import Mesh
+
 
 class ClassificationData(BaseDataset):
 
     def __init__(self, opt):
         BaseDataset.__init__(self, opt)
         self.opt = opt
-        self.device = torch.device('cuda:{}'.format(opt.gpu_ids[0])) if opt.gpu_ids else torch.device('cpu')
+        self.device = torch.device('cuda:{}'.format(
+            opt.gpu_ids[0])) if opt.gpu_ids else torch.device('cpu')
         self.root = opt.dataroot
         self.dir = os.path.join(opt.dataroot)
         self.classes, self.class_to_idx = self.find_classes(self.dir)
-        self.paths = self.make_dataset_by_class(self.dir, self.class_to_idx, opt.phase)
+        self.paths = self.make_dataset_by_class(
+            self.dir, self.class_to_idx, opt.phase)
         self.nclasses = len(self.classes)
         self.size = len(self.paths)
         self.get_mean_std()
@@ -24,7 +28,8 @@ class ClassificationData(BaseDataset):
     def __getitem__(self, index):
         path = self.paths[index][0]
         label = self.paths[index][1]
-        mesh = Mesh(file=path, opt=self.opt, hold_history=False, export_folder=self.opt.export_folder)
+        mesh = Mesh(file=path, opt=self.opt, hold_history=False,
+                    export_folder=self.opt.export_folder)
         meta = {'mesh': mesh, 'label': label}
         # get edge features
         edge_features = mesh.extract_features()
@@ -38,7 +43,8 @@ class ClassificationData(BaseDataset):
     # this is when the folders are organized by class...
     @staticmethod
     def find_classes(dir):
-        classes = [d for d in os.listdir(dir) if os.path.isdir(os.path.join(dir, d))]
+        classes = [d for d in os.listdir(
+            dir) if os.path.isdir(os.path.join(dir, d))]
         classes.sort()
         class_to_idx = {classes[i]: i for i in range(len(classes))}
         return classes, class_to_idx
@@ -53,7 +59,7 @@ class ClassificationData(BaseDataset):
                 continue
             for root, _, fnames in sorted(os.walk(d)):
                 for fname in sorted(fnames):
-                    if is_mesh_file(fname) and (root.count(phase)==1):
+                    if is_mesh_file(fname) and (root.count(phase) == 1):
                         path = os.path.join(root, fname)
                         item = (path, class_to_idx[target])
                         meshes.append(item)

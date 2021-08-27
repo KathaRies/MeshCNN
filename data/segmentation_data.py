@@ -1,22 +1,28 @@
 import os
 import torch
-from data.base_dataset import BaseDataset
-from util.util import is_mesh_file, pad
 import numpy as np
-from models.layers.mesh import Mesh
+
+from MeshCNN.data.base_dataset import BaseDataset
+from MeshCNN.util.util import is_mesh_file, pad
+from MeshCNN.models.layers.mesh import Mesh
+
 
 class SegmentationData(BaseDataset):
 
     def __init__(self, opt):
         BaseDataset.__init__(self, opt)
         self.opt = opt
-        self.device = torch.device('cuda:{}'.format(opt.gpu_ids[0])) if opt.gpu_ids else torch.device('cpu')
+        self.device = torch.device('cuda:{}'.format(
+            opt.gpu_ids[0])) if opt.gpu_ids else torch.device('cpu')
         self.root = opt.dataroot
         self.dir = os.path.join(opt.dataroot, opt.phase)
         self.paths = self.make_dataset(self.dir)
-        self.seg_paths = self.get_seg_files(self.paths, os.path.join(self.root, 'seg'), seg_ext='.eseg')
-        self.sseg_paths = self.get_seg_files(self.paths, os.path.join(self.root, 'sseg'), seg_ext='.seseg')
-        self.classes, self.offset = self.get_n_segs(os.path.join(self.root, 'classes.txt'), self.seg_paths)
+        self.seg_paths = self.get_seg_files(
+            self.paths, os.path.join(self.root, 'seg'), seg_ext='.eseg')
+        self.sseg_paths = self.get_seg_files(
+            self.paths, os.path.join(self.root, 'sseg'), seg_ext='.seseg')
+        self.classes, self.offset = self.get_n_segs(
+            os.path.join(self.root, 'classes.txt'), self.seg_paths)
         self.nclasses = len(self.classes)
         self.size = len(self.paths)
         self.get_mean_std()
@@ -26,14 +32,16 @@ class SegmentationData(BaseDataset):
 
     def __getitem__(self, index):
         path = self.paths[index]
-        mesh = Mesh(file=path, opt=self.opt, hold_history=True, export_folder=self.opt.export_folder)
+        mesh = Mesh(file=path, opt=self.opt, hold_history=True,
+                    export_folder=self.opt.export_folder)
         meta = {}
         meta['mesh'] = mesh
         label = read_seg(self.seg_paths[index]) - self.offset
         label = pad(label, self.opt.ninput_edges, val=-1, dim=0)
         meta['label'] = label
         soft_label = read_sseg(self.sseg_paths[index])
-        meta['soft_label'] = pad(soft_label, self.opt.ninput_edges, val=-1, dim=0)
+        meta['soft_label'] = pad(
+            soft_label, self.opt.ninput_edges, val=-1, dim=0)
         # get edge features
         edge_features = mesh.extract_features()
         edge_features = pad(edge_features, self.opt.ninput_edges)
@@ -47,7 +55,8 @@ class SegmentationData(BaseDataset):
     def get_seg_files(paths, seg_dir, seg_ext='.seg'):
         segs = []
         for path in paths:
-            segfile = os.path.join(seg_dir, os.path.splitext(os.path.basename(path))[0] + seg_ext)
+            segfile = os.path.join(seg_dir, os.path.splitext(
+                os.path.basename(path))[0] + seg_ext)
             assert(os.path.isfile(segfile))
             segs.append(segfile)
         return segs
