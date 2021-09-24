@@ -49,7 +49,9 @@ class MeshPool(nn.Module):
         last_count = mesh.edges_count + 1
         mask = np.ones(mesh.edges_count, dtype=np.bool)
         edge_groups = MeshUnion(mesh.edges_count, self.__fe.device)
+        i = 0
         while mesh.edges_count > self.__out_target:
+            i += 1
             value, edge_id = heappop(queue)
             edge_id = int(edge_id)
             if mask[edge_id]:
